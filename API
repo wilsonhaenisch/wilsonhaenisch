@@ -1,0 +1,72 @@
+# Params
+param([string] $channel)
+
+#Import Required Modules
+
+
+Import-Module -Name 7Zip4Powershell   
+
+#variables
+$token = "Enter access token here"
+$header = @{'Authorization'='Bearer ' +$token; 'Accept' = 'application/json'} 
+$header2 = @{'Authorization'='Bearer ' +$token}  
+$location = 'C:\Program Files (x86)'
+$url = "https://API Addess"
+
+# Make API request, selecting JSON properties for response
+$getdelivery = Invoke-WebRequest -Method Get -uri $url -Headers $header | ConvertFrom-Json
+
+#gather all deliveryids from API
+$listOfids = $getdelivery.items | Sort-Object deliveredAt -Descending
+
+#Assign only the most recent id to variable
+$id = $listOfids.id[0]
+
+# Make API request, to pull the file
+$pullurl = "https://app.api.us.healtheintent.com/data-syndication/v1/downloads/$id"
+
+$output = $location + "\api_" + $id + ".tar.gz" 
+
+$pull = Invoke-WebRequest -Uri $pullurl -Headers $header2 -Method Get -OutFile $output
+
+Expand-7Zip -ArchiveFileName $output -TargetPath $location
+
+#use C# to decode lz4 files, write them to output folder, clean raw folder
+$Assem = ([Reflection.Assembly]::UnsafeLoadFrom("C:\Program Files (x86)\Utils\K4os.Compression.LZ4.Streams.dll"),
+            [Reflection.Assembly]::UnsafeLoadFrom("C:\Program Files (x86)\Utils\K4os.Compression.LZ4.dll"),
+             [Reflection.Assembly]::UnsafeLoadFrom("C:\Program Files (x86)\Utils\K4os.Hash.xxHash.dll"))
+$Source = @”
+using K4os.Compression.LZ4.Streams;
+using System.IO;
+
+namespace API.Tools
+{
+    public static class DeCode
+    {
+        public static void Get()
+        {
+            string path = @"C:\Program Files (x86);
+            DirectoryInfo d = new DirectoryInfo(path);
+
+            foreach (var file in d.GetFiles("*.lz4"))
+            {  
+
+                using (var source = LZ4Stream.Decode(File.OpenRead(file.FullName)))
+                using (var target = File.Create(@"C:\Program Files (x86)" + Path.GetFileNameWithoutExtension(file.Name) + ".txt"))
+                    {
+                        source.CopyTo(target);
+                    }
+            }
+
+            foreach (FileInfo file in d.GetFiles())
+            {
+                file.Delete();
+            }
+        }
+    }
+}
+“@
+
+Add-Type -ReferencedAssemblies $Assem -TypeDefinition $Source -Language CSharp  
+
+[API.Tools.DeCode]::Get()
