@@ -3,7 +3,6 @@ param([string] $channel)
 
 #Import Required Modules
 
-
 Import-Module -Name 7Zip4Powershell   
 
 #variables
@@ -23,7 +22,7 @@ $listOfids = $getdelivery.items | Sort-Object deliveredAt -Descending
 $id = $listOfids.id[0]
 
 # Make API request, to pull the file
-$pullurl = "https://app.api.us.healtheintent.com/data-syndication/v1/downloads/$id"
+$pullurl = "https://pull url/$id"
 
 $output = $location + "\api_" + $id + ".tar.gz" 
 
